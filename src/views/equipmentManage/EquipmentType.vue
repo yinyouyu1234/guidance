@@ -1,0 +1,298 @@
+<template>
+  <div class="equipment-type--warpper">
+    <view-title title="设备类型" icon="icon-shebei"/>
+    <search>
+      <el-form :inline="true">
+        <el-form-item label="设备名称">
+          <el-input
+            size="mini"
+            v-model="condition.equipment_type_name"
+            clearable
+            placeholder="请输入设备名称"
+          ></el-input>
+        </el-form-item>
+        <el-form-item label="生产厂家">
+          <el-input size="mini" v-model="condition.manufacturer" clearable placeholder="请输入生产厂家"></el-input>
+        </el-form-item>
+        <el-form-item prop="code" label="片区">
+          <QcCascder v-model="cascaderValue" @changeCode="changeCode"/>
+        </el-form-item>
+        <el-form-item>
+          <el-button size="mini" @click="filter" :loading="loading">查询</el-button>
+          <el-button size="mini" type="primary" @click="addClick">添加</el-button>
+        </el-form-item>
+      </el-form>
+    </search>
+    <div style="padding:20px">
+      <pc-table
+        :tableData="tableData"
+        :columnData="columnData"
+        :loading="tableLoading"
+        :total="total"
+        :page-index="condition.pageIndex"
+        @edit="edit"
+        @disable="disable"
+        @enable="enable"
+        @changePage="changePage"
+      />
+    </div>
+  </div>
+</template>
+<script>
+import ViewTitle from "@/components/ViewTitle.vue";
+import Search from "@/components/Search.vue";
+import PcTable from "@/components/Table.vue";
+import QcCascder from "@/components/QcCascder.vue";
+export default {
+  name: "GuidanceRemote",
+  components: {
+    ViewTitle,
+    Search,
+    PcTable,
+    QcCascder
+  },
+  data() {
+    return {
+      cascaderArrayStaitc: ["area", "group", "factory", "branch_factory"],
+      cascaderValue: [],
+      total: 0,
+      loading: false,
+      tableLoading: false,
+      tableData: [],
+      ruleForm: {
+        number: "",
+        name: "",
+        password: "",
+        phoneNumber: "",
+        department: "",
+        post: "",
+        textareaText: "",
+        category: ""
+      },
+      condition: {
+        area: "",
+        group: "",
+        factory: "",
+        branch_factory: "",
+        pageIndex: "1",
+        pageSize: "10",
+        equipment_type_name: "",
+        manufacturer: ""
+      },
+      columnData: [
+        {
+          prop: "equipment_type_code",
+          width: "120",
+          label: "编号"
+        },
+        {
+          prop: "equipment_type_name",
+          label: "设备名称"
+        },
+        {
+          prop: "manufacturer",
+          label: "生产厂家"
+        },
+        {
+          prop: "remark",
+          label: "备注"
+        }
+      ],
+      options: [
+        {
+          value: "选项1",
+          label: "启用"
+        },
+        {
+          value: "选项2",
+          label: "禁用"
+        }
+      ]
+    };
+  },
+  watch: {
+    cascaderValue() {
+      console.log(this.cascaderValue);
+      // const list = [...this.cascaderArrayStaitc];
+      // this.cascaderArrayStaitc.forEach(key => {
+      //   delete this.condition[key];
+      // });
+      // list.length = this.cascaderValue.length;
+      // list.forEach((key, index) => {
+      //   this.condition[key] = this.cascaderArrayStaitc[index];
+      // });
+    }
+  },
+  created() {
+    this.getData();
+  },
+  mounted() {},
+  methods: {
+    changeCode(data) {
+      console.log(data);
+      const list = [...this.cascaderArrayStaitc];
+      this.cascaderArrayStaitc.forEach(key => {
+        delete this.condition[key];
+      });
+      list.length = this.cascaderValue.length;
+      list.forEach((key, index) => {
+        this.condition[key] = data[index];
+      });
+    },
+    changePage(page) {
+      this.condition.pageIndex = page;
+      this.getData();
+    },
+    getData(filter = false) {
+      this.tableLoading = true;
+      this.$axios
+        .post(`${this.api}/equipmentType/getList`, this.condition)
+        .then(res => {
+          this.loading = false;
+          this.tableLoading = false;
+          if (res.data.retCode == 10000) {
+            this.total = res.data.data.total;
+            const data = res.data.data.items;
+            data.forEach((item, index) => {
+              item.index = index;
+              item.statusCode = item.status;
+              item.status = item.status == 1 ? "启用" : "禁用";
+              if (item.statusCode == 1) {
+                item.buttonInfo = [
+                  {
+                    name: "edit",
+                    type: "primary",
+                    label: "编辑"
+                  },
+                  {
+                    name: "disable",
+                    type: "danger",
+                    label: "禁用"
+                  }
+                ];
+              } else {
+                item.buttonInfo = [
+                  {
+                    name: "edit",
+                    type: "primary",
+                    label: "编辑"
+                  },
+                  {
+                    name: "enable",
+                    type: "primary",
+                    label: "启用"
+                  }
+                ];
+              }
+            });
+            this.tableData = data;
+            filter &&
+              this.$message({
+                message: "搜索成功",
+                type: "success"
+              });
+          }
+        })
+        .catch(err => {
+          this.loading = false;
+        });
+    },
+    enable(row) {
+      this.$axios
+        .get(
+          `${this.api}/equipmentType/changeState?id=${row.id}&user_id=${
+            this.$store.state.app.user_id
+          }`
+        )
+        .then(res => {
+          if (res.data.retCode == 10000) {
+            this.$message({
+              message: "操作成功",
+              type: "success"
+            });
+            row.buttonInfo.splice(1, 1, {
+              label: "禁用",
+              name: "disable",
+              type: "danger"
+            });
+          }
+        });
+    },
+    disable(row) {
+      this.$axios
+        .get(
+          `${this.api}/equipmentType/changeState?id=${row.id}&user_id=${
+            this.$store.state.app.user_id
+          }`
+        )
+        .then(res => {
+          if (res.data.retCode == 10000) {
+            row.buttonInfo.splice(1, 1, {
+              label: "启用",
+              name: "enable",
+              type: "primary"
+            });
+            this.$message({
+              message: "操作成功",
+              type: "success"
+            });
+          }
+        });
+    },
+    addClick() {
+      this.$router.push({
+        path: "/EditEquipmentType"
+      });
+    },
+    edit(row) {
+      this.$router.push({
+        path: "/EditEquipmentType",
+        query: {
+          type: "edit",
+          id: row.id
+        }
+      });
+    },
+    filter() {
+      this.loading = true;
+      this.condition.pageIndex = 1;
+      this.getData(true);
+    }
+  }
+};
+</script>
+<style lang="less">
+.equipment-type--warpper {
+  .dialog-title {
+    font-size: 18px;
+    font-weight: bold;
+    padding: 20px;
+  }
+  .item-title {
+    font-size: 15px;
+    padding: 10px 0;
+    .el-icon-circle-plus-outline {
+      font-size: 15px;
+      color: #409eff;
+      cursor: pointer;
+    }
+  }
+  .left-table {
+    float: left;
+    width: 24%;
+    padding-right: 30px;
+    padding-left: 30px;
+    padding-bottom: 30px;
+    border-right: 1px solid #dcdfe6;
+  }
+  .right-table {
+    float: left;
+    width: 60%;
+    padding-left: 30px;
+  }
+  .empty {
+    clear: both;
+  }
+}
+</style>
+

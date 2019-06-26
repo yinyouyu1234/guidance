@@ -1,0 +1,185 @@
+<template>
+  <div class="mine-submit-video--warpper">
+    <view-title title="待审核视频" icon="icon-wofaqide"/>
+    <search>
+      <el-form :inline="true">
+        <el-form-item label="项目名称">
+          <el-input size="mini" v-model="condition.projectName" clearable placeholder="请输入项目名称"></el-input>
+        </el-form-item>
+
+        <el-form-item label="审核人员">
+          <el-select size="mini" v-model="condition.reviewUserId" placeholder="请选择">
+            <el-option
+              v-for="item in optionsPersonnel"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            ></el-option>
+          </el-select>
+        </el-form-item>
+        <el-form-item>
+          <el-button size="mini" @click="filter" :loading="loading">查询</el-button>
+        </el-form-item>
+      </el-form>
+    </search>
+    <div style="padding:20px">
+      <pc-table
+        :tableData="tableData"
+        :columnData="columnData"
+        :loading="tableLoading"
+        :total="total"
+        :page-index="condition.page"
+        @edit="edit"
+        @changePage="changePage"
+      />
+    </div>
+  </div>
+</template>
+<script>
+import ViewTitle from "@/components/ViewTitle.vue";
+import Search from "@/components/Search.vue";
+import PcTable from "@/components/Table.vue";
+import qs from "qs";
+export default {
+  name: "PendingApprovalVideo",
+  components: {
+    ViewTitle,
+    Search,
+    PcTable
+  },
+  data() {
+    return {
+      total: 0,
+      loading: false,
+      tableLoading: false,
+      condition: {
+        page: 1,
+        size: 10,
+        projectName: "",
+        userId: "",
+        reviewUserId: "",
+        reviewStatus: 0
+      },
+      optionsPersonnel: [],
+      tableData: [],
+      columnData: [
+        {
+          prop: "index",
+          width: "70",
+          label: "编号"
+        },
+        {
+          prop: "projectName",
+          label: "项目名称"
+        },
+        {
+          prop: "uploadTime",
+          label: "上传时间"
+        },
+        {
+          prop: "reviewStatus",
+          label: "审核状态"
+        },
+        {
+          prop: "reviewTime",
+          label: "审核时间"
+        },
+        {
+          prop: "timeLength",
+          label: "时长"
+        },
+        {
+          prop: "tags",
+          label: "标签"
+        }
+      ]
+    };
+  },
+  watch: {
+    dialogFormVisible() {
+      if (!this.dialogFormVisible) {
+        this.fileList = [];
+        this.imgList = [];
+        this.ruleForm = {
+          title: "",
+          content: "",
+          id: "",
+          img: []
+        };
+      }
+    }
+  },
+  created() {
+    this.getNewsList();
+    this.getOptionsPersonnel();
+  },
+  mounted() {},
+
+  methods: {
+    getOptionsPersonnel() {
+      this.$axios.get(`${this.commonApi}/user/1`).then(res => {
+        if (res.data.retCode == 10000) {
+          this.optionsPersonnel = res.data.data;
+          this.optionsPersonnel.unshift({
+            value: "",
+            label: "全部"
+          });
+        }
+      });
+    },
+    edit(row) {
+      this.$router.push({
+        path: "/SubmitVideoDetail",
+        query: {
+          id: row.id,
+          pageState: "pending"
+        }
+      });
+    },
+    changePage(page) {
+      this.condition.page = page;
+      this.getNewsList();
+    },
+    filter() {
+      this.condition.page = 1;
+      this.getNewsList(true);
+    },
+    getNewsList(filter = false) {
+      this.loading = true;
+      this.tableLoading = true;
+      this.$axios
+        .get(`${this.api}/knowledgeBase/list?${qs.stringify(this.condition)}`)
+        .then(res => {
+          this.loading = false;
+          this.tableLoading = false;
+          if (res.data.retCode == 10000) {
+            const data = res.data.data.list;
+            this.total = res.data.data.total;
+            data.forEach((item, index) => {
+              item.index = index + 1 + (this.condition.page - 1) * 10;
+              item.buttonInfo = [
+                {
+                  name: "edit",
+                  type: "primary",
+                  label: "查看"
+                }
+              ];
+            });
+            this.tableData = data;
+            filter &&
+              this.$message({
+                message: "搜索成功",
+                type: "success"
+              });
+          }
+        })
+        .catch(err => {
+          this.loading = false;
+        });
+    }
+  }
+};
+</script>
+<style lang="less">
+</style>
+
